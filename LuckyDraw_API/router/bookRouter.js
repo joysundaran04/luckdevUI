@@ -8,7 +8,7 @@ const Agent = require("../models/agent");
 // ================= CREATE BOOK ================= 1
 router.post("/", async (req, res) => {
   try {
-    const { bookNumber, name, phone, agentId } = req.body;
+    const { bookNumber, name, phone, whatsappNumber, address, agentId } = req.body;
 
     if (!bookNumber || !name || !phone) {
       return res.status(400).json({
@@ -47,6 +47,8 @@ router.post("/", async (req, res) => {
       bookNumber,
       name,
       phone,
+      whatsappNumber: whatsappNumber || null,
+      address: address || null,
       agentId: agentId || null,
       monthlyAmount: 500,
       totalMonths,
@@ -80,7 +82,7 @@ router.get("/books/:id", async (req, res) => {
   try {
 
     const book = await Book.findById(req.params.id)
-      .populate("agentId", "name phone");
+      .populate("agentId", "name mobileNumber whatsappNumber");
 
     if (!book) {
       return res.status(404).json({
@@ -112,6 +114,8 @@ router.get("/books/:id", async (req, res) => {
         bookNumber: book.bookNumber,
         name: book.name,
         phone: book.phone,
+        whatsappNumber: book.whatsappNumber,
+        address: book.address,
         monthlyAmount: book.monthlyAmount,
         contributionStatus: book.contributionStatus,
         luckyDrawStatus: book.luckyDrawStatus,
@@ -159,7 +163,8 @@ router.get("/books", async (req, res) => {
       query.$or = [
         { bookNumber: { $regex: search, $options: "i" } },
         { name: { $regex: search, $options: "i" } },
-        { phone: { $regex: search, $options: "i" } }
+        { phone: { $regex: search, $options: "i" } },
+        { whatsappNumber: { $regex: search, $options: "i" } }
       ];
     }
 
@@ -184,9 +189,9 @@ router.get("/books", async (req, res) => {
     const totalRecords = await Book.countDocuments(query);
 
     const books = await Book.find(query)
-      .populate("agentId", "name")
+      .populate("agentId", "name mobileNumber whatsappNumber")
       .select(
-        "bookNumber name phone monthlyAmount contributionStatus luckyDrawStatus agentId totalMonths payments"
+        "bookNumber name phone whatsappNumber address monthlyAmount contributionStatus luckyDrawStatus agentId totalMonths payments"
       )
       .skip((page - 1) * limit)
       .limit(limit)
@@ -328,6 +333,8 @@ router.put("/:id", async (req, res) => {
     const allowedFields = [
       "name",
       "phone",
+      "whatsappNumber",
+      "address",
       "monthlyAmount",
       "contributionStatus",
       "luckyDrawStatus",
@@ -405,7 +412,7 @@ router.get("/active/book-numbers", async (req, res) => {
 router.get("/winners", async (req, res) => {
   try {
     const winners = await Book.find({ luckyDrawStatus: "Won", isDeleted: { $ne: true } })
-      .select("bookNumber name phone wonDate wonMonth prizeNumber")
+      .select("bookNumber name phone whatsappNumber wonDate wonMonth prizeNumber")
       .sort({ wonDate: -1 })
       .lean();
 

@@ -17,6 +17,14 @@ const bookSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    whatsappNumber: {
+        type: String,
+        default: null
+    },
+    address: {
+        type: String,
+        default: null
+    },
     prizeNumber: {
         type: Number,
         default: null
