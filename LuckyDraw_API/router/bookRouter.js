@@ -8,7 +8,7 @@ const Agent = require("../models/agent");
 // ================= CREATE BOOK ================= 1
 router.post("/", async (req, res) => {
   try {
-    const { bookNumber, name, phone } = req.body;
+    const { bookNumber, name, phone, agentId } = req.body;
 
     if (!bookNumber || !name || !phone) {
       return res.status(400).json({
@@ -47,6 +47,7 @@ router.post("/", async (req, res) => {
       bookNumber,
       name,
       phone,
+      agentId: agentId || null,
       monthlyAmount: 500,
       totalMonths,
       payments

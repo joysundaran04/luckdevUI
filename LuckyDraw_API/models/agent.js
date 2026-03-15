@@ -10,6 +10,11 @@ const agentSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true
+  },
+  mobileNumber: {
+    type: String,
+    required: true,
+    trim: true
   }
 }, { timestamps: true });
 

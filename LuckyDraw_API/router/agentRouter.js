@@ -7,15 +7,15 @@ const Agent = require("../models/agent");
 // ================= CREATE AGENT =================
 router.post("/", async (req, res) => {
   try {
-    const { name, place } = req.body;
+    const { name, place, mobileNumber } = req.body;
 
-    if (!name || !place) {
+    if (!name || !place || !mobileNumber) {
       return res.status(400).json({
-        message: "Name and place are required"
+        message: "Name, place, and mobile number are required"
       });
     }
 
-    const agent = await Agent.create({ name, place });
+    const agent = await Agent.create({ name, place, mobileNumber });
 
     res.status(201).json({
       message: "Agent created successfully",
@@ -66,11 +66,11 @@ router.get("/:id", async (req, res) => {
 // ================= UPDATE AGENT =================
 router.put("/:id", async (req, res) => {
   try {
-    const { name, place } = req.body;
+    const { name, place, mobileNumber } = req.body;
 
     const agent = await Agent.findByIdAndUpdate(
       req.params.id,
-      { $set: { name, place } },
+      { $set: { name, place, mobileNumber } },
       { new: true }
     );
 
