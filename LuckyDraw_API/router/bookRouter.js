@@ -76,7 +76,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-
 // ================= GET BOOK BY ID ================= 1
 router.get("/books/:id", async (req, res) => {
   try {
@@ -120,6 +119,9 @@ router.get("/books/:id", async (req, res) => {
         contributionStatus: book.contributionStatus,
         luckyDrawStatus: book.luckyDrawStatus,
         wonDate: book.wonDate,
+        wonMonth: book.wonMonth,
+        prizeNumber: book.prizeNumber,
+        priceDistributionStatus: book.priceDistributionStatus,
         agent: book.agentId,
 
         summary: {
@@ -182,9 +184,9 @@ router.get("/books", async (req, res) => {
       query.contributionStatus = status;
     }
 
-    // if (agentId) {
-    //   query.agentId = agentId;
-    // }
+    if (agentId) {
+      query.agentId = agentId;
+    }
 
     const totalRecords = await Book.countDocuments(query);
 
@@ -352,15 +354,6 @@ router.put("/:id", async (req, res) => {
         updates[key] = req.body[key];
       }
     });
-
-    if (req.body.prizeNumber !== undefined) {
-      updates["prizeDetails.prizeNumber"] = req.body.prizeNumber;
-    }
-
-    if (req.body.priceDistributionStatus !== undefined) {
-      updates["prizeDetails.priceDistributionStatus"] =
-        req.body.priceDistributionStatus;
-    }
 
     if (req.body.luckyDrawStatus === "Won") {
       updates.wonDate = new Date();

@@ -31,8 +31,9 @@ const bookSchema = new mongoose.Schema({
     },
 
     priceDistributionStatus: {
-        type: Boolean,
-        default: false
+        type: String,
+        enum: ["Distribution", "Pending","Claimed" ,"NotClaimed"],
+        default: "NotClaimed"
     },
 
     // ✅ Agent Reference
