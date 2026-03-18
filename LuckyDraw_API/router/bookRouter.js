@@ -388,16 +388,24 @@ router.get("/active/book-numbers", async (req, res) => {
         contributionStatus: "Active",
         isDeleted: { $ne: true }
       },
-      { bookNumber: 1, _id: 0 }   // Projection
-    ).lean();
+      { bookNumber: 1, name: 1, agentId: 1, _id: 0 }   // Projection
+    )
+    .populate("agentId", "name")
+    .lean();
 
-    // Even lighter response (optional)
-    const bookNumbers = books.map(b => b.bookNumber);
+    const formattedBooks = books.map(b => ({
+      bookNumber: b.bookNumber,
+      name: b.name,
+      agentName: b.agentId ? b.agentId.name : "No Agent"
+    }));
 
-    res.json(bookNumbers);
+    res.json({
+      success: true,
+      data: formattedBooks
+    });
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
