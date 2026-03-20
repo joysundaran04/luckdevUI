@@ -67,6 +67,9 @@ const bookSchema = new mongoose.Schema({
                 min: 1,
                 max: 10
             },
+            monthName: {
+                type: String
+            },
             paid: {
                 type: Boolean,
                 default: false
@@ -81,7 +84,7 @@ const bookSchema = new mongoose.Schema({
 
     luckyDrawStatus: {
         type: String,
-        enum: ["NotDraw", "Won"],
+        enum: ["NotDraw", "Won","Discontinued"],
         default: "NotDraw"
     },
 

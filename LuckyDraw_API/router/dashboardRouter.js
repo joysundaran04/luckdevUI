@@ -14,21 +14,25 @@ router.get("/stats", async (req, res) => {
         // Prizes Claimed / Won
         const prizesClaimedBooks = await Book.countDocuments({ luckyDrawStatus: "Won", isDeleted: { $ne: true } });
 
+        const prizeDistributedBooks = await Book.countDocuments({ 
+            priceDistributionStatus: { $in: ["Distributed", "Distribution"] }, 
+            isDeleted: { $ne: true } 
+        });
+
         // Total Agents
         const totalAgents = await Agent.countDocuments();
 
         // Amount Calculations
-        const books = await Book.find({ isDeleted: { $ne: true } }).select("monthlyAmount totalMonths payments contributionStatus");
+        const books = await Book.find({ isDeleted: { $ne: true } }).select("monthlyAmount totalMonths payments contributionStatus luckyDrawStatus priceDistributionStatus");
 
         let collectionAmount = 0;
         let totalAmount = 0;
         let discontinuedAmount = 0;
-
+        let wonAmount = 0;
+        let activeBooksAmount = 0;
+        let prizeDistributedAmount = 0;
+        console.log(books);
         books.forEach(book => {
-            if (book.contributionStatus !== "Discontinued") {
-                totalAmount += (book.monthlyAmount * book.totalMonths);
-            }
-
             let bookPaidAmount = 0;
             if (book.payments && book.payments.length > 0) {
                 book.payments.forEach(payment => {
@@ -38,14 +42,34 @@ router.get("/stats", async (req, res) => {
                 });
             }
 
+            if (book.contributionStatus !== "Discontinued" && book.contributionStatus !== "Completed") {
+                totalAmount += (book.monthlyAmount * book.totalMonths);
+            } else {
+                totalAmount += bookPaidAmount;
+            }
+
             collectionAmount += bookPaidAmount;
 
             if (book.contributionStatus === "Discontinued") {
                 discontinuedAmount += bookPaidAmount;
             }
+
+            if (book.luckyDrawStatus === "Won" || book.luckyDrawStatus === "Winner") {
+                wonAmount += bookPaidAmount;
+            }
+
+            if (book.contributionStatus === "Active") {
+                activeBooksAmount += bookPaidAmount;
+            }
+
+            if (book.priceDistributionStatus === "Distributed" || book.priceDistributionStatus === "Distribution") {
+                prizeDistributedAmount += bookPaidAmount;
+            }
         });
 
-        const upcomingAmount = totalAmount - (collectionAmount - discontinuedAmount);
+        // upcomingAmount equation remains the same or you might want totalAmount - collectionAmount
+        // Using existing logic:
+        const upcomingAmount = totalAmount - collectionAmount;
 
         res.json({
             success: true,
@@ -54,11 +78,15 @@ router.get("/stats", async (req, res) => {
                 activeBooks,
                 discontinuedBooks,
                 prizesClaimedBooks,
+                prizeDistributedBooks,
                 totalAgents,
                 totalAmount,
                 collectionAmount,
                 upcomingAmount,
                 discontinuedAmount,
+                wonAmount,
+                activeBooksAmount,
+                prizeDistributedAmount,
                 price: 500 // Assuming base price is 500
             }
         });

@@ -36,9 +36,11 @@ router.post("/", async (req, res) => {
     // }
 
     const totalMonths = 10;
+    const monthNames = ["July", "August", "September", "October", "November", "December", "January", "February", "March", "April"];
 
-    const payments = Array.from({ length: totalMonths }, (_, i) => ({
+    const payments = monthNames.map((month, i) => ({
       monthNumber: i + 1,
+      monthName: month,
       paid: false,
       amount: 0
     }));
@@ -303,13 +305,14 @@ router.put("/:id/month/:monthNumber", async (req, res) => {
       month.paidDate = null;
     }
 
-    const paidMonths = book.payments.filter(p => p.paid).length;
+    // const paidMonths = book.payments.filter(p => p.paid).length;
 
-    if (paidMonths === book.totalMonths) {
-      book.contributionStatus = "Completed";
-    } else if (paidMonths === 0) {
-      book.contributionStatus = "Active";
-    }
+    // Disabled auto-completion status update per user request
+    // if (paidMonths === book.totalMonths) {
+    //   book.contributionStatus = "Completed";
+    // } else if (paidMonths === 0) {
+    //   book.contributionStatus = "Active";
+    // }
 
     await book.save();
 
@@ -385,13 +388,13 @@ router.get("/active/book-numbers", async (req, res) => {
 
     const books = await Book.find(
       {
-        contributionStatus: "Active",
+        luckyDrawStatus: "NotDraw",
         isDeleted: { $ne: true }
       },
       { bookNumber: 1, name: 1, agentId: 1, _id: 0 }   // Projection
     )
-    .populate("agentId", "name")
-    .lean();
+      .populate("agentId", "name")
+      .lean();
 
     const formattedBooks = books.map(b => ({
       bookNumber: b.bookNumber,
@@ -417,9 +420,27 @@ router.get("/winners", async (req, res) => {
       .sort({ wonDate: -1 })
       .lean();
 
+    const monthNamesMap = {
+      1: "July 2026",
+      2: "August 2026",
+      3: "September 2026",
+      4: "October 2026",
+      5: "November 2026",
+      6: "December 2026",
+      7: "January 2027",
+      8: "February 2027",
+      9: "March 2027",
+      10: "April 2027"
+    };
+
+    const formattedWinners = winners.map(w => ({
+      ...w,
+      wonMonth: w.wonMonth ? (monthNamesMap[w.wonMonth] || w.wonMonth) : null
+    }));
+
     res.json({
       success: true,
-      data: winners
+      data: formattedWinners
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
