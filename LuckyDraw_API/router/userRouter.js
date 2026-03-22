@@ -71,8 +71,10 @@ router.get("/", async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const total = await User.countDocuments();
-    const users = await User.find().skip(skip).limit(limit);
+    const [total, users] = await Promise.all([
+      User.countDocuments(),
+      User.find().skip(skip).limit(limit).lean()
+    ]);
 
     res.json({
       data: users,
@@ -88,7 +90,7 @@ router.get("/", async (req, res) => {
 
 // ================= GET USER BY ID =================
 router.get("/:id", async (req, res) => {
-  const user = await User.findById(req.params.id);
+  const user = await User.findById(req.params.id).lean();
   res.json(user);
 });
 

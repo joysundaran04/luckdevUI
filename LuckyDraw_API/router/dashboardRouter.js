@@ -8,70 +8,122 @@ const Agent = require("../models/agent");
 router.get("/stats", async (req, res) => {
     try {
         // Fetch all stats concurrently to improve API response time
-        const [
-            totalBooks,
-            activeBooks,
-            discontinuedBooks,
-            prizesClaimedBooks,
-            prizeDistributedBooks,
-            totalAgents,
-            books
-        ] = await Promise.all([
-            Book.countDocuments({ isDeleted: { $ne: true } }),
-            Book.countDocuments({ contributionStatus: "Active", isDeleted: { $ne: true } }),
-            Book.countDocuments({ contributionStatus: "Discontinued", isDeleted: { $ne: true } }),
-            Book.countDocuments({ luckyDrawStatus: "Won", isDeleted: { $ne: true } }),
-            Book.countDocuments({ 
-                priceDistributionStatus: { $in: ["Distributed", "Distribution"] }, 
-                isDeleted: { $ne: true } 
-            }),
-            Agent.countDocuments(),
-            // Use lean() for faster execution as we only need JS objects, not Mongoose documents
-            Book.find({ isDeleted: { $ne: true } })
-                .select("monthlyAmount totalMonths payments contributionStatus luckyDrawStatus priceDistributionStatus")
-                .lean()
+        // We use a single MongoDB Aggregation Pipeline for all Book metrics to minimize network overhead and processing time
+        const [bookStatsData, totalAgents] = await Promise.all([
+            Book.aggregate([
+                { $match: { isDeleted: { $ne: true } } },
+                {
+                    $addFields: {
+                        bookPaidAmount: {
+                            $reduce: {
+                                input: {
+                                    $filter: {
+                                        input: { $ifNull: ["$payments", []] },
+                                        as: "payment",
+                                        cond: { $eq: ["$$payment.paid", true] }
+                                    }
+                                },
+                                initialValue: 0,
+                                in: { $add: ["$$value", "$$this.amount"] }
+                            }
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalBooks: { $sum: 1 },
+                        activeBooks: {
+                            $sum: { $cond: [{ $eq: ["$contributionStatus", "Active"] }, 1, 0] }
+                        },
+                        discontinuedBooks: {
+                            $sum: { $cond: [{ $eq: ["$contributionStatus", "Discontinued"] }, 1, 0] }
+                        },
+                        prizesClaimedBooks: {
+                            $sum: { $cond: [{ $eq: ["$luckyDrawStatus", "Won"] }, 1, 0] }
+                        },
+                        prizeDistributedBooks: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $or: [
+                                            { $eq: ["$priceDistributionStatus", "Distributed"] },
+                                            { $eq: ["$priceDistributionStatus", "Distribution"] }
+                                        ]
+                                    },
+                                    1,
+                                    0
+                                ]
+                            }
+                        },
+                        totalAmount: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $and: [
+                                            { $ne: ["$contributionStatus", "Discontinued"] },
+                                            { $ne: ["$contributionStatus", "Completed"] }
+                                        ]
+                                    },
+                                    { $multiply: [{ $ifNull: ["$monthlyAmount", 0] }, { $ifNull: ["$totalMonths", 0] }] },
+                                    "$bookPaidAmount"
+                                ]
+                            }
+                        },
+                        collectionAmount: { $sum: "$bookPaidAmount" },
+                        discontinuedAmount: {
+                            $sum: { $cond: [{ $eq: ["$contributionStatus", "Discontinued"] }, "$bookPaidAmount", 0] }
+                        },
+                        wonAmount: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $or: [
+                                            { $eq: ["$luckyDrawStatus", "Won"] },
+                                            { $eq: ["$luckyDrawStatus", "Winner"] }
+                                        ]
+                                    },
+                                    "$bookPaidAmount",
+                                    0
+                                ]
+                            }
+                        },
+                        activeBooksAmount: {
+                            $sum: { $cond: [{ $eq: ["$contributionStatus", "Active"] }, "$bookPaidAmount", 0] }
+                        },
+                        prizeDistributedAmount: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $or: [
+                                            { $eq: ["$priceDistributionStatus", "Distributed"] },
+                                            { $eq: ["$priceDistributionStatus", "Distribution"] }
+                                        ]
+                                    },
+                                    "$bookPaidAmount",
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                }
+            ]),
+            Agent.countDocuments()
         ]);
 
-        let collectionAmount = 0;
-        let totalAmount = 0;
-        let discontinuedAmount = 0;
-        let wonAmount = 0;
-        let activeBooksAmount = 0;
-        let prizeDistributedAmount = 0;
-        books.forEach(book => {
-            let bookPaidAmount = 0;
-            if (book.payments && book.payments.length > 0) {
-                book.payments.forEach(payment => {
-                    if (payment.paid) {
-                        bookPaidAmount += payment.amount;
-                    }
-                });
-            }
-
-            if (book.contributionStatus !== "Discontinued" && book.contributionStatus !== "Completed") {
-                totalAmount += (book.monthlyAmount * book.totalMonths);
-            } else {
-                totalAmount += bookPaidAmount;
-            }
-
-            collectionAmount += bookPaidAmount;
-
-            if (book.contributionStatus === "Discontinued") {
-                discontinuedAmount += bookPaidAmount;
-            }
-
-            if (book.luckyDrawStatus === "Won" || book.luckyDrawStatus === "Winner") {
-                wonAmount += bookPaidAmount;
-            }
-
-            if (book.contributionStatus === "Active") {
-                activeBooksAmount += bookPaidAmount;
-            }
-
-            if (book.priceDistributionStatus === "Distributed" || book.priceDistributionStatus === "Distribution") {
-                prizeDistributedAmount += bookPaidAmount;
-            }
-        });
+        const {
+            totalBooks = 0,
+            activeBooks = 0,
+            discontinuedBooks = 0,
+            prizesClaimedBooks = 0,
+            prizeDistributedBooks = 0,
+            totalAmount = 0,
+            collectionAmount = 0,
+            discontinuedAmount = 0,
+            wonAmount = 0,
+            activeBooksAmount = 0,
+            prizeDistributedAmount = 0
+        } = bookStatsData[0] || {};
 
         // upcomingAmount equation remains the same or you might want totalAmount - collectionAmount
         // Using existing logic:

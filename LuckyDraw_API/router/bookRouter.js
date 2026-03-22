@@ -190,17 +190,18 @@ router.get("/books", async (req, res) => {
       query.agentId = agentId;
     }
 
-    const totalRecords = await Book.countDocuments(query);
-
-    const books = await Book.find(query)
-      .populate("agentId", "name mobileNumber whatsappNumber")
-      .select(
-        "bookNumber name phone whatsappNumber address monthlyAmount contributionStatus luckyDrawStatus agentId totalMonths payments"
-      )
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .sort({ createdAt: -1 })
-      .lean();
+    const [totalRecords, books] = await Promise.all([
+      Book.countDocuments(query),
+      Book.find(query)
+        .populate("agentId", "name mobileNumber whatsappNumber")
+        .select(
+          "bookNumber name phone whatsappNumber address monthlyAmount contributionStatus luckyDrawStatus agentId totalMonths payments"
+        )
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .lean()
+    ]);
 
     const formattedBooks = books.map((book) => {
       const paidMonths = book.payments ? book.payments.filter(p => p.paid).length : 0;

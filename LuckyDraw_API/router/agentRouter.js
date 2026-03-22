@@ -31,10 +31,32 @@ router.post("/", async (req, res) => {
 // ================= GET ALL AGENTS =================
 router.get("/", async (req, res) => {
   try {
-    const agents = await Agent.find().sort({ createdAt: -1 });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    
+    let query = {};
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { place: { $regex: search, $options: "i" } },
+        { mobileNumber: { $regex: search, $options: "i" } }
+      ];
+    }
+
+    const [totalItems, agents] = await Promise.all([
+      Agent.countDocuments(query),
+      Agent.find(query)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean()
+    ]);
 
     res.json({
-      total: agents.length,
+      totalItems,
+      totalPages: Math.ceil(totalItems / limit),
+      currentPage: page,
       data: agents
     });
 
@@ -47,7 +69,7 @@ router.get("/", async (req, res) => {
 // ================= GET AGENT BY ID =================
 router.get("/:id", async (req, res) => {
   try {
-    const agent = await Agent.findById(req.params.id);
+    const agent = await Agent.findById(req.params.id).lean();
 
     if (!agent) {
       return res.status(404).json({
