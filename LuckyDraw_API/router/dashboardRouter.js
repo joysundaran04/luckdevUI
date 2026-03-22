@@ -7,23 +7,30 @@ const Agent = require("../models/agent");
 // ================= GET DASHBOARD STATS =================
 router.get("/stats", async (req, res) => {
     try {
-        const totalBooks = await Book.countDocuments({ isDeleted: { $ne: true } });
-        const activeBooks = await Book.countDocuments({ contributionStatus: "Active", isDeleted: { $ne: true } });
-        const discontinuedBooks = await Book.countDocuments({ contributionStatus: "Discontinued", isDeleted: { $ne: true } });
-
-        // Prizes Claimed / Won
-        const prizesClaimedBooks = await Book.countDocuments({ luckyDrawStatus: "Won", isDeleted: { $ne: true } });
-
-        const prizeDistributedBooks = await Book.countDocuments({ 
-            priceDistributionStatus: { $in: ["Distributed", "Distribution"] }, 
-            isDeleted: { $ne: true } 
-        });
-
-        // Total Agents
-        const totalAgents = await Agent.countDocuments();
-
-        // Amount Calculations
-        const books = await Book.find({ isDeleted: { $ne: true } }).select("monthlyAmount totalMonths payments contributionStatus luckyDrawStatus priceDistributionStatus");
+        // Fetch all stats concurrently to improve API response time
+        const [
+            totalBooks,
+            activeBooks,
+            discontinuedBooks,
+            prizesClaimedBooks,
+            prizeDistributedBooks,
+            totalAgents,
+            books
+        ] = await Promise.all([
+            Book.countDocuments({ isDeleted: { $ne: true } }),
+            Book.countDocuments({ contributionStatus: "Active", isDeleted: { $ne: true } }),
+            Book.countDocuments({ contributionStatus: "Discontinued", isDeleted: { $ne: true } }),
+            Book.countDocuments({ luckyDrawStatus: "Won", isDeleted: { $ne: true } }),
+            Book.countDocuments({ 
+                priceDistributionStatus: { $in: ["Distributed", "Distribution"] }, 
+                isDeleted: { $ne: true } 
+            }),
+            Agent.countDocuments(),
+            // Use lean() for faster execution as we only need JS objects, not Mongoose documents
+            Book.find({ isDeleted: { $ne: true } })
+                .select("monthlyAmount totalMonths payments contributionStatus luckyDrawStatus priceDistributionStatus")
+                .lean()
+        ]);
 
         let collectionAmount = 0;
         let totalAmount = 0;
@@ -31,7 +38,6 @@ router.get("/stats", async (req, res) => {
         let wonAmount = 0;
         let activeBooksAmount = 0;
         let prizeDistributedAmount = 0;
-        console.log(books);
         books.forEach(book => {
             let bookPaidAmount = 0;
             if (book.payments && book.payments.length > 0) {
