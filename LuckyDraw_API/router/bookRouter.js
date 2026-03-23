@@ -3,6 +3,7 @@ const router = express.Router();
 
 const Book = require("../models/book");
 const Agent = require("../models/agent");
+const Prize = require("../models/prize");
 
 
 // ================= CREATE BOOK ================= 1
@@ -369,6 +370,32 @@ router.put("/:id", async (req, res) => {
       { new: true }
     );
 
+    // --- PRIZE SYNC LOGIC ---
+    // If the book was given a prize, create/update the corresponding Prize document
+    if (updatedBook.luckyDrawStatus === "Won" || updatedBook.prizeNumber) {
+      if (updatedBook.prizeNumber && updatedBook.wonMonth) {
+        const monthNamesMap = {
+          1: "July 2026", 2: "August 2026", 3: "September 2026", 4: "October 2026",
+          5: "November 2026", 6: "December 2026", 7: "January 2027", 8: "February 2027",
+          9: "March 2027", 10: "April 2027"
+        };
+        const wonMonthNum = updatedBook.wonMonth;
+        const mappedMonthName = monthNamesMap[wonMonthNum] || wonMonthNum.toString();
+
+        // Update the existing Prize entry that matches the submitted prizeNumber
+        await Prize.findOneAndUpdate(
+          { prizeNumber: String(updatedBook.prizeNumber) },
+          {
+            priceDistributionStatus: updatedBook.priceDistributionStatus || "NotClaimed",
+            monthName: mappedMonthName,
+            bookId: updatedBook._id
+          },
+          { new: true }
+        );
+      }
+    }
+    // -------------------------
+
     res.json({
       success: true,
       message: "Book updated successfully",
@@ -416,23 +443,51 @@ router.get("/active/book-numbers", async (req, res) => {
 // ================= GET WINNERS ================= 
 router.get("/winners", async (req, res) => {
   try {
-    const winners = await Book.find({ luckyDrawStatus: "Won", isDeleted: { $ne: true } })
-      .select("bookNumber name phone whatsappNumber wonDate wonMonth prizeNumber")
-      .sort({ wonDate: -1 })
-      .lean();
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    const monthFilter = req.query.monthFilter || "";
+
+    const query = { luckyDrawStatus: "Won", isDeleted: { $ne: true } };
+
+    if (monthFilter) {
+      query.wonMonth = monthFilter;
+    }
 
     const monthNamesMap = {
-      1: "July 2026",
-      2: "August 2026",
-      3: "September 2026",
-      4: "October 2026",
-      5: "November 2026",
-      6: "December 2026",
-      7: "January 2027",
-      8: "February 2027",
-      9: "March 2027",
-      10: "April 2027"
+      1: "July 2026", 2: "August 2026", 3: "September 2026", 4: "October 2026",
+      5: "November 2026", 6: "December 2026", 7: "January 2027", 8: "February 2027",
+      9: "March 2027", 10: "April 2027"
     };
+
+    if (search) {
+      let matchedMonthKeys = Object.keys(monthNamesMap).filter(k => 
+         monthNamesMap[k].toLowerCase().includes(search.toLowerCase())
+      );
+
+      query.$or = [
+        { bookNumber: { $regex: search, $options: "i" } },
+        { name: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } },
+        { prizeNumber: { $regex: search, $options: "i" } },
+        { wonMonth: { $regex: search, $options: "i" } }
+      ];
+
+      if (matchedMonthKeys.length > 0) {
+        query.$or.push({ wonMonth: { $in: matchedMonthKeys } });
+        query.$or.push({ wonMonth: { $in: matchedMonthKeys.map(Number) } });
+      }
+    }
+
+    const [totalRecords, winners] = await Promise.all([
+      Book.countDocuments(query),
+      Book.find(query)
+        .select("bookNumber name phone whatsappNumber wonDate wonMonth prizeNumber")
+        .sort({ wonDate: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean()
+    ]);
 
     const formattedWinners = winners.map(w => ({
       ...w,
@@ -441,6 +496,9 @@ router.get("/winners", async (req, res) => {
 
     res.json({
       success: true,
+      currentPage: page,
+      totalPages: Math.ceil(totalRecords / limit),
+      totalRecords,
       data: formattedWinners
     });
   } catch (error) {

@@ -7,6 +7,7 @@ const bookRoutes = require("./router/bookRouter.js");
 const userRoutes = require("./router/userRouter.js");
 const agentRoutes = require("./router/agentRouter.js");
 const dashboardRoutes = require("./router/dashboardRouter.js");
+const prizeRoutes = require("./router/prizeRouter.js");
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '8.8.4.4']);
 
@@ -35,6 +36,7 @@ app.use("/api/book", bookRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/agent", agentRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/prize", prizeRoutes);
 
 // Start Server
 app.listen(5000, () => {

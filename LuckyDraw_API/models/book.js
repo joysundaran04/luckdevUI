@@ -26,7 +26,7 @@ const bookSchema = new mongoose.Schema({
         default: null
     },
     prizeNumber: {
-        type: Number,
+        type: String,
         default: null
     },
 
@@ -105,5 +105,8 @@ const bookSchema = new mongoose.Schema({
 bookSchema.index({ bookNumber: 1 });
 bookSchema.index({ agentId: 1 });
 bookSchema.index({ luckyDrawStatus: 1 });
+bookSchema.index({ name: 1 });
+bookSchema.index({ phone: 1 });
+bookSchema.index({ whatsappNumber: 1 });
 
 module.exports = mongoose.model("Book", bookSchema);
