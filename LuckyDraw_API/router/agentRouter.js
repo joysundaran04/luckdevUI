@@ -32,7 +32,11 @@ router.post("/", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    let limit = 10;
+    if (req.query.limit !== undefined && req.query.limit !== '') {
+        limit = parseInt(req.query.limit);
+        if (isNaN(limit) || limit < 0) limit = 10;
+    }
     const search = req.query.search || "";
     
     let query = {};
@@ -55,7 +59,7 @@ router.get("/", async (req, res) => {
 
     res.json({
       totalItems,
-      totalPages: Math.ceil(totalItems / limit),
+      totalPages: limit > 0 ? Math.ceil(totalItems / limit) : 1,
       currentPage: page,
       data: agents
     });

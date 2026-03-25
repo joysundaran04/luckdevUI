@@ -14,6 +14,14 @@ router.post("/", async (req, res) => {
       });
     }
 
+    const existingPrize = await Prize.findOne({ prizeNumber, monthName: monthName || null });
+    if (existingPrize) {
+      return res.status(400).json({
+        success: false,
+        message: `Prize number ${prizeNumber} already exists for this month (${monthName || 'No Month'})`
+      });
+    }
+
     const newPrize = await Prize.create({
       prizeNumber,
       prizeName,
@@ -130,6 +138,30 @@ router.put("/:id", async (req, res) => {
         updates[key] = req.body[key];
       }
     });
+
+    const currentPrize = await Prize.findById(req.params.id);
+    if (!currentPrize) {
+      return res.status(404).json({
+        success: false,
+        message: "Prize not found"
+      });
+    }
+
+    const newPrizeNumber = updates.prizeNumber !== undefined ? updates.prizeNumber : currentPrize.prizeNumber;
+    const newMonthName = updates.monthName !== undefined ? updates.monthName : currentPrize.monthName;
+
+    const existingPrize = await Prize.findOne({ 
+      prizeNumber: newPrizeNumber, 
+      monthName: newMonthName || null,
+      _id: { $ne: req.params.id }
+    });
+
+    if (existingPrize) {
+      return res.status(400).json({
+        success: false,
+        message: `Prize number ${newPrizeNumber} already exists for this month (${newMonthName || 'No Month'})`
+      });
+    }
 
     const updatedPrize = await Prize.findByIdAndUpdate(
       req.params.id,

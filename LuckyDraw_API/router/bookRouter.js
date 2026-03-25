@@ -268,7 +268,7 @@ router.put("/:id/month/:monthNumber", async (req, res) => {
   try {
 
     const { id, monthNumber } = req.params;
-    const { paid, amount } = req.body;
+    const { paid, amount, paidDate } = req.body;
 
     const book = await Book.findById(id);
 
@@ -301,7 +301,7 @@ router.put("/:id/month/:monthNumber", async (req, res) => {
 
     if (paid) {
       month.amount = amount || book.monthlyAmount;
-      month.paidDate = new Date();
+      month.paidDate = paidDate ? new Date(paidDate) : new Date();
     } else {
       month.amount = 0;
       month.paidDate = null;
